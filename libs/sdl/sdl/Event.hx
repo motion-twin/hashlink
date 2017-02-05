@@ -11,6 +11,7 @@ package sdl;
 	public var keyRepeat : Bool;
 	public var controller : Int;
 	public var value : Int;
+	public var text : String;
 	public function new() {
 	}
 }
@@ -30,6 +31,7 @@ package sdl;
 	var GControllerDown		= 11;
 	var GControllerUp		= 12;
 	var GControllerAxis 	= 13;
+	var TextInput   = 14;
 }
 
 @:enum abstract WindowStateChange(Int) {

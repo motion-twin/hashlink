@@ -35,7 +35,8 @@ typedef enum {
 	GControllerRemoved,
 	GControllerDown,
 	GControllerUp,
-	GControllerAxis
+	GControllerAxis,
+	TextInput
 } event_type;
 
 typedef enum {
@@ -66,6 +67,7 @@ typedef struct {
 	bool keyRepeat;
 	int controller;
 	int value;
+	vstring *text;
 } event_data;
 
 HL_PRIM bool HL_NAME(init_once)() {
@@ -171,9 +173,15 @@ HL_PRIM bool HL_NAME(event_loop)( event_data *event ) {
 			}
 			break;
 		case SDL_TEXTEDITING:
-		case SDL_TEXTINPUT:
 			// skip
 			continue;
+		case SDL_TEXTINPUT:
+			event->type = TextInput;
+			event->text = (vstring*)hl_gc_alloc(sizeof(vstring));
+			event->text->length = hl_utf8_length(e.text.text, 0);
+			event->text->bytes = (uchar*)hl_gc_alloc_noptr((event->text->length + 1) * sizeof(uchar));
+			hl_from_utf8(event->text->bytes, event->text->length + 1, e.text.text);
+			break;
 		case SDL_CONTROLLERDEVICEADDED:
 			event->type = GControllerAdded;
 			event->controller = e.jdevice.which;
@@ -247,8 +255,24 @@ HL_PRIM bool HL_NAME(detect_win32)() {
 #	endif
 }
 
+HL_PRIM void HL_NAME(start_text_input)() {
+	SDL_StartTextInput();
+}
+
+HL_PRIM void HL_NAME(stop_text_input)() {
+	SDL_StopTextInput();
+}
+
+HL_PRIM vbyte *HL_NAME(get_clipboard_text_bytes)() {
+	return (vbyte*)SDL_GetClipboardText();
+}
+
+HL_PRIM void HL_NAME(set_clipboard_text_bytes)(vbyte *v) {
+	SDL_SetClipboardText(v);
+}
+
 DEFINE_PRIM(_BOOL, init_once, _NO_ARG);
-DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32) );
+DEFINE_PRIM(_BOOL, event_loop, _OBJ(_I32 _I32 _I32 _I32 _I32 _I32 _I32 _BOOL _I32 _I32 _STRING) );
 DEFINE_PRIM(_VOID, quit, _NO_ARG);
 DEFINE_PRIM(_VOID, delay, _I32);
 DEFINE_PRIM(_I32, get_screen_width, _NO_ARG);
@@ -256,6 +280,10 @@ DEFINE_PRIM(_I32, get_screen_height, _NO_ARG);
 DEFINE_PRIM(_VOID, message_box, _BYTES _BYTES _BOOL);
 DEFINE_PRIM(_VOID, set_vsync, _BOOL);
 DEFINE_PRIM(_BOOL, detect_win32, _NO_ARG);
+DEFINE_PRIM(_VOID, start_text_input, _NO_ARG);
+DEFINE_PRIM(_VOID, stop_text_input, _NO_ARG);
+DEFINE_PRIM(_BYTES, get_clipboard_text_bytes, _NO_ARG);
+DEFINE_PRIM(_VOID, set_clipboard_text_bytes, _BYTES);
 
 // Window
 

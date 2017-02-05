@@ -133,4 +133,25 @@ class Sdl {
 		return false;
 	}
 
+	public static function startTextInput(){
+	}
+
+	public static function stopTextInput(){
+	}
+
+	inline public static function getClipboardText(){
+		return @:privateAccess String.fromUTF8(getClipboardTextBytes());
+	}
+
+	static function getClipboardTextBytes() : hl.Bytes {
+		return null;
+	}
+
+	inline public static function setClipboardText( str : String ){
+		setClipboardTextBytes( @:privateAccess str.toUtf8() );
+	}
+
+	static function setClipboardTextBytes( v : hl.Bytes ){
+	}
+
 }
