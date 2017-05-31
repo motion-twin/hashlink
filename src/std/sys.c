@@ -570,7 +570,7 @@ HL_PRIM void hl_sys_init(void **args, int nargs, void *hlfile) {
 }
 
 HL_PRIM vbyte *hl_sys_hl_file() {
-	return hl_file;
+	return hl_file!=NULL ? hl_file : hl_sys_exe_path();
 }
 
 
