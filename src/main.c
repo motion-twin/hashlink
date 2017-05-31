@@ -48,13 +48,12 @@ typedef char pchar;
 
 extern void *hl_callback( void *f, hl_type *t, void **args, vdynamic *ret );
 
-static hl_code *load_code( const pchar *file ) {
-	hl_code *code;
-	FILE *f = pfopen(file,"rb");
+static char *load_file(const pchar *file, int *fsize) {
+	FILE *f = pfopen(file, "rb");
 	int pos, size;
 	char *fdata;
-	if( f == NULL ) {
-		pprintf("File not found '%s'\n",file);
+	if (f == NULL) {
+		pprintf("File not found '%s'\n", file);
 		return NULL;
 	}
 	fseek(f, 0, SEEK_END);
@@ -62,15 +61,78 @@ static hl_code *load_code( const pchar *file ) {
 	fseek(f, 0, SEEK_SET);
 	fdata = (char*)malloc(size);
 	pos = 0;
-	while( pos < size ) {
-		int r = (int)fread(fdata + pos, 1, size-pos, f);
-		if( r <= 0 ) {
-			pprintf("Failed to read '%s'\n",file);
+	while (pos < size) {
+		int r = (int)fread(fdata + pos, 1, size - pos, f);
+		if (r <= 0) {
+			pprintf("Failed to read '%s'\n", file);
+			fclose(f);
 			return NULL;
 		}
 		pos += r;
 	}
 	fclose(f);
+	*fsize = size;
+	return fdata;
+}
+
+int embed_standalone(pchar *file, pchar *dest) {
+	int size;
+	char *data = load_file(file, &size);
+	if (data == NULL) 
+		return 1;
+
+#if defined(HL_WIN)
+	static pchar path[MAX_PATH];
+	HANDLE h;
+	
+	if (GetModuleFileNameW(NULL, path, MAX_PATH) == 0) {
+		printf("Failed to find HL executable\n");
+		return 1;
+	}
+
+	if (!CopyFile(path, dest, false)) {
+		pprintf("Failed to write '%s'\n", dest);
+		return 1;
+	}
+
+	h = BeginUpdateResource(dest, false);
+	if (h == NULL) {
+		pprintf("Failed to open '%s'.", dest);
+		return 1;
+	}
+
+	UpdateResource(h, RT_RCDATA, L"hlboot.dat", MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), data, size);
+	EndUpdateResource(h, FALSE);
+	return 0;
+#else
+	printf("Not implemented\n");
+	return 1;
+#endif
+}
+
+hl_code *try_load_embedded_module() {
+	hl_code *code = NULL;
+
+#ifdef HL_WIN
+	int size;
+	char *fdata;
+	HRSRC rsrc = FindResource(NULL, L"hlboot.dat", RT_RCDATA);
+	if (rsrc != NULL) {
+		size = SizeofResource(NULL, rsrc);
+		fdata = LoadResource(NULL, rsrc);
+		if (size > 0 && fdata != NULL) 
+			code = hl_code_read((unsigned char*)fdata, size);
+	}
+#endif
+
+	return code;
+}
+
+static hl_code *load_code( const pchar *file ) {
+	hl_code *code;
+	int size;
+	char *fdata = load_file(file, &size);
+	if (fdata == NULL) return NULL;
 	code = hl_code_read((unsigned char*)fdata, size);
 	free(fdata);
 	return code;
@@ -100,6 +162,7 @@ int main(int argc, pchar *argv[]) {
 	pchar *file = NULL;
 	int debug_port = -1;
 	bool debug_wait = false;
+	pchar *standalone = NULL;
 	struct {
 		hl_code *code;
 		hl_module *m;
@@ -112,6 +175,11 @@ int main(int argc, pchar *argv[]) {
 	while( argc ) {
 		pchar *arg = *argv++;
 		argc--;
+		if (pcompare(arg, PSTR("--standalone")) == 0) {
+			if (argc-- == 0) break;
+			standalone = *argv++;
+			continue;
+		}
 		if( pcompare(arg,PSTR("--debug")) == 0 ) {
 			if( argc-- == 0 ) break;
 			debug_port = ptoi(*argv++);
@@ -133,7 +201,16 @@ int main(int argc, pchar *argv[]) {
 		file = arg;
 		break;
 	}
-	if( file == NULL ) {
+	if (standalone != NULL) 
+		return embed_standalone(file,standalone);
+	ctx.code = try_load_embedded_module();
+	if (ctx.code != NULL) {
+		file = NULL;
+		if (first_boot_arg >= 0) {
+			argv -= first_boot_arg;
+			argc = first_boot_arg;
+		}
+	} else if (file == NULL) {
 		FILE *fchk;
 		file = PSTR("hlboot.dat");
 		fchk = pfopen(file,"rb");
@@ -156,7 +233,8 @@ int main(int argc, pchar *argv[]) {
 #	endif
 	hl_global_init(&ctx);
 	hl_sys_init((void**)argv,argc,file);
-	ctx.code = load_code(file);
+	if( ctx.code == NULL )
+		ctx.code = load_code(file);
 	if( ctx.code == NULL )
 		return 1;
 	ctx.m = hl_module_alloc(ctx.code);
