@@ -108,6 +108,14 @@ HL_PRIM void HL_NAME(gctrl_update)(dx_gctrl_data *data) {
 		gctrl_updateXInput(data);
 }
 
+HL_PRIM void HL_NAME(gctrl_set_vibration)(dx_gctrl *ctrl, double strength) {
+	if (ctrl->xUID >= 0) {
+		XINPUT_VIBRATION vibration;
+		vibration.wLeftMotorSpeed = vibration.wRightMotorSpeed = (WORD)(strength * 65535);
+		XInputSetState(ctrl->xUID, &vibration);
+	}
+}
+
 HL_PRIM vbyte *HL_NAME(gctrl_name)(dx_gctrl *gctrl) {
 	return "XInput";
 }
@@ -117,3 +125,4 @@ DEFINE_PRIM(_VOID, gctrl_init, _NO_ARG);
 DEFINE_PRIM(_VOID, gctrl_detect, _FUN(_VOID, TGAMECTRL _BOOL));
 DEFINE_PRIM(_BYTES, gctrl_name, TGAMECTRL);
 DEFINE_PRIM(_VOID, gctrl_update, _OBJ(TGAMECTRL _STRING _I32 _F64 _F64 _F64 _F64 _F64 _F64));
+DEFINE_PRIM(_VOID, gctrl_set_vibration, TGAMECTRL _F64);

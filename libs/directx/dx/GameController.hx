@@ -46,13 +46,18 @@ class GameController {
 		this.name = @:privateAccess String.fromUTF8(gctrlName(ptr));
 	}
 	
-	public function update(){
+	public inline function update(){
 		gctrlUpdate(this);
 	}
 	
+	public inline function setVibration( strength : Float ){
+		gctrlSetVibration(ptr,strength);
+	}
+		
 	static function gctrlInit(){}
 	static function gctrlDetect( onDetect : GameControllerPtr -> Bool -> Void ){}
 	static function gctrlUpdate( pad : GameController ){}
 	static function gctrlName( ptr : GameControllerPtr ) : hl.Bytes { return null; }
+	static function gctrlSetVibration( ptr : GameControllerPtr, strength : Float ){}
 	
 }
