@@ -43,7 +43,7 @@ class GameController {
 	
 	public function new( ptr : GameControllerPtr, name : hl.Bytes ){
 		this.ptr = ptr;
-		this.name = @:privateAccess String.fromUCS2(name);
+		this.name = @:privateAccess String.fromUTF8(name);
 	}
 	
 	public inline function update(){
