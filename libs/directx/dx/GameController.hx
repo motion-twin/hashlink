@@ -26,7 +26,7 @@ class GameController {
 		gctrlInit();
 	}
 	
-	public static function detect( onDetect : GameControllerPtr -> Bool -> Void ){
+	public static function detect( onDetect : GameControllerPtr -> hl.Bytes -> Void ){
 		gctrlDetect(onDetect);
 	}
 
@@ -41,9 +41,9 @@ class GameController {
 	public var lt : Float;
 	public var rt : Float;
 	
-	public function new( ptr : GameControllerPtr ){
+	public function new( ptr : GameControllerPtr, name : hl.Bytes ){
 		this.ptr = ptr;
-		this.name = @:privateAccess String.fromUTF8(gctrlName(ptr));
+		this.name = @:privateAccess String.fromUCS2(name);
 	}
 	
 	public inline function update(){
@@ -55,9 +55,8 @@ class GameController {
 	}
 		
 	static function gctrlInit(){}
-	static function gctrlDetect( onDetect : GameControllerPtr -> Bool -> Void ){}
+	static function gctrlDetect( onDetect : GameControllerPtr -> hl.Bytes -> Void ){}
 	static function gctrlUpdate( pad : GameController ){}
-	static function gctrlName( ptr : GameControllerPtr ) : hl.Bytes { return null; }
 	static function gctrlSetVibration( ptr : GameControllerPtr, strength : Float ){}
 	
 }
