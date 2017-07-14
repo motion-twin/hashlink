@@ -691,4 +691,10 @@ HL_API vdynamic *hl_current_exc;
 
 C_FUNCTION_END
 
+typedef struct _hl_addrinfo hl_addrinfo;
+struct _hl_addrinfo {
+	void(*finalize)(hl_addrinfo *);
+	void *ptr;
+};
+
 #endif

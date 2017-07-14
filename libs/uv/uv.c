@@ -211,6 +211,41 @@ DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID,_BOOL));
 DEFINE_PRIM(_BOOL, tcp_bind_wrap, _TCP _I32 _I32);
 DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
 
+// DNS
+
+static void addrinfo_finalize(hl_addrinfo *addr) {
+	uv_freeaddrinfo((struct addrinfo*)addr->ptr);
+}
+
+void on_resolve(uv_getaddrinfo_t *h, int status, struct addrinfo *resp) {
+	hl_addrinfo *addr = NULL;
+	vclosure *cb = (vclosure*)h->data;
+	if( resp ) {
+		addr = (hl_addrinfo*)hl_gc_alloc_finalizer(sizeof(hl_addrinfo));
+		addr->finalize = addrinfo_finalize;
+		addr->ptr = (void*)resp;
+	}
+
+	if( cb->hasValue )
+		((void(*)(void*, int, hl_addrinfo*))cb->fun)(cb->value, status, addr);
+	else
+		((void(*)(int, hl_addrinfo*))cb->fun)(status, addr);
+		
+	free(h);
+}
+
+HL_PRIM bool HL_NAME(resolve)(uv_loop_t *loop, char *node, char *service, vclosure *cb) {
+	uv_getaddrinfo_t *h = UV_ALLOC(uv_getaddrinfo_t);
+	h->data = (void*)cb;
+	int r = uv_getaddrinfo(loop, h, on_resolve, node, service, NULL);
+	if( r ) {
+		free(h);
+		return false;
+	}
+	return true;
+}
+DEFINE_PRIM(_BOOL, resolve, _LOOP _BYTES _BYTES _FUN(_VOID, _I32 _ABSTRACT(hl_addrinfo)));
+
 // loop
 
 DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);

@@ -28,6 +28,7 @@
 #	define _WINSOCKAPI_
 #	include <hl.h>
 #	include <winsock2.h>
+#	include <ws2tcpip.h>
 #	define FDSIZE(n)	(sizeof(u_int) + (n) * sizeof(SOCKET))
 #	define SHUT_WR		SD_SEND
 #	define SHUT_RD		SD_RECEIVE
@@ -87,6 +88,10 @@ extern int gethostname( char *name, size_t len );
 typedef struct _hl_socket {
 	SOCKET sock;
 } hl_socket;
+
+static void addrinfo_finalize(hl_addrinfo *addr) {
+	freeaddrinfo(addr->ptr);
+}
 
 static int block_error() {
 #ifdef HL_WIN
@@ -230,6 +235,14 @@ HL_PRIM vbyte *hl_host_local() {
 	return hl_copy_bytes((vbyte*)buf,(int)strlen(buf)+1);
 }
 
+HL_PRIM hl_addrinfo *hl_getaddrinfo( char *node, char *service ) {
+	hl_addrinfo *addr = (hl_addrinfo*)hl_gc_alloc_finalizer(sizeof(hl_addrinfo));
+	addr->finalize = addrinfo_finalize;
+	if( getaddrinfo(node, service, NULL, &(struct addrinfo*)addr->ptr) != 0 )
+		return NULL;
+	return addr;
+}
+
 HL_PRIM bool hl_socket_connect( hl_socket *s, int host, int port ) {
 	struct sockaddr_in addr;
 	memset(&addr,0,sizeof(addr));
@@ -238,6 +251,17 @@ HL_PRIM bool hl_socket_connect( hl_socket *s, int host, int port ) {
 	*(int*)&addr.sin_addr.s_addr = host;
 	if( !s ) return false;
 	if( connect(s->sock,(struct sockaddr*)&addr,sizeof(addr)) != 0 ) {
+		int err = block_error();
+		if( err == -1 ) return true; // in progress
+		return false;
+	}
+	return true;
+}
+
+HL_PRIM bool hl_socket_connect_addr(hl_socket *s, hl_addrinfo *addr) {
+	struct addrinfo *ai = (struct addrinfo*)addr->ptr;
+	if( !s || !ai ) return false;
+	if( connect(s->sock, ai->ai_addr, ai->ai_addrlen) != 0 ) {
 		int err = block_error();
 		if( err == -1 ) return true; // in progress
 		return false;
@@ -453,6 +477,7 @@ HL_PRIM bool hl_socket_select( varray *ra, varray *wa, varray *ea, char *tmp, in
 }
 
 #define _SOCK	_ABSTRACT(hl_socket)
+#define _ADDR	_ABSTRACT(hl_addrinfo)
 DEFINE_PRIM(_VOID,socket_init,_NO_ARG);
 DEFINE_PRIM(_SOCK,socket_new,_BOOL);
 DEFINE_PRIM(_VOID,socket_close,_SOCK);
@@ -465,6 +490,7 @@ DEFINE_PRIM(_BYTES,host_to_string,_I32);
 DEFINE_PRIM(_BYTES,host_reverse,_I32);
 DEFINE_PRIM(_BYTES,host_local,_NO_ARG);
 DEFINE_PRIM(_BOOL,socket_connect,_SOCK _I32 _I32);
+DEFINE_PRIM(_BOOL, socket_connect_addr, _SOCK _ADDR);
 DEFINE_PRIM(_BOOL,socket_listen,_SOCK _I32);
 DEFINE_PRIM(_BOOL,socket_bind,_SOCK _I32 _I32);
 DEFINE_PRIM(_SOCK,socket_accept,_SOCK);
