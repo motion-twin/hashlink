@@ -211,6 +211,50 @@ DEFINE_PRIM(_HANDLE, tcp_connect_wrap, _TCP _I32 _I32 _FUN(_VOID,_BOOL));
 DEFINE_PRIM(_BOOL, tcp_bind_wrap, _TCP _I32 _I32);
 DEFINE_PRIM(_HANDLE, tcp_accept_wrap, _HANDLE);
 
+// DNS
+
+void on_resolve(uv_getaddrinfo_t *h, int status, struct addrinfo *resp) {
+	vclosure *cb = (vclosure*)h->data;
+	hl_remove_root(&h->data);
+	int ipv4 = 0;
+	vbyte *ipv6 = NULL;
+	if (status == 0 && resp) {
+		if (resp->ai_family == AF_INET) {
+			ipv4 = ((struct sockaddr_in*)resp->ai_addr)->sin_addr.s_addr;
+		} else if (resp->ai_family == AF_INET6) {
+			struct in6_addr *ip = &((struct sockaddr_in6 *)resp->ai_addr)->sin6_addr;
+			ipv6 = hl_copy_bytes((vbyte*)ip, sizeof(ip));
+		} else {
+			hl_error("Unsupported address family");
+		}
+	}
+
+	if (cb->hasValue)
+		((void(*)(void*, int, int, vbyte*))cb->fun)(cb->value, status, ipv4, ipv6);
+	else
+		((void(*)(int, int, vbyte*))cb->fun)(status, ipv4, ipv6);
+
+	free(h);
+}
+
+
+HL_PRIM bool HL_NAME(resolve)(uv_loop_t *loop, char *node, int ihints, vclosure *cb) {
+	// TODO hints
+	uv_getaddrinfo_t *h = UV_ALLOC(uv_getaddrinfo_t);
+	memset(h, 0, sizeof(h));
+	h->data = (void*)cb;
+	int r = uv_getaddrinfo(loop, h, on_resolve, node, NULL, NULL);
+	if (r) {
+		free(h);
+		return false;
+	}
+	hl_add_root(&h->data);
+	return true;
+}
+
+DEFINE_PRIM(_BOOL, resolve, _LOOP _BYTES _I32 _FUN(_VOID, _I32 _I32 _BYTES));
+
+
 // loop
 
 DEFINE_PRIM(_LOOP, default_loop, _NO_ARG);
