@@ -54,6 +54,15 @@ static dx_gctrl_device *dx_gctrl_removed = NULL;
 static CRITICAL_SECTION dx_gctrl_cs;
 static bool dx_gctrl_syncNeeded = FALSE;
 
+// XInput
+typedef DWORD(WINAPI *XInputGetCapabilities_t)(DWORD dwUserIndex, DWORD dwFlags, XINPUT_CAPABILITIES* pCapabilities);
+typedef DWORD(WINAPI *XInputGetState_t)(DWORD dwUserIndex, XINPUT_STATE* pState);
+typedef DWORD(WINAPI *XInputSetState_t)(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration);
+
+XInputGetCapabilities_t _XInputGetCapabilities = NULL;
+XInputGetState_t _XInputGetState = NULL;
+XInputSetState_t _XInputSetState = NULL;
+
 // DirectInput specific
 static LPDIRECTINPUT8 gctrl_dinput = NULL;
 static varray *gctrl_dinput_mappings = NULL;
@@ -88,7 +97,7 @@ static void gctrl_xinput_add(int uid, dx_gctrl_device **current) {
 
 static void gctrl_xinput_update(dx_gctrl_data *data) {
 	XINPUT_STATE state;
-	HRESULT r = XInputGetState(data->device->xUID, &state);
+	HRESULT r = _XInputGetState(data->device->xUID, &state);
 	if (FAILED(r))
 		return;
 
@@ -104,10 +113,25 @@ static void gctrl_xinput_update(dx_gctrl_data *data) {
 // DirectInput
 
 static void gctrl_dinput_init( varray *mappings ) {
-	if( !gctrl_dinput) {
+	if( !gctrl_dinput ) {
 		HINSTANCE instance = GetModuleHandle(NULL);
 		if( instance )
 			DirectInput8Create(instance, DIRECTINPUT_VERSION, &IID_IDirectInput8, &gctrl_dinput, NULL);
+	}
+	if( !_XInputGetCapabilities ) {
+		HANDLE dll = LoadLibrary(L"XInput1_4.dll");
+		if( !dll ) dll = LoadLibrary(L"XInput1_3.dll");
+		if( !dll ) dll = LoadLibrary(L"XInput9_1_0.dll");
+		if( dll ) {
+			_XInputGetState = (XInputGetState_t)GetProcAddress((HMODULE)dll, "XInputGetState");
+			_XInputSetState = (XInputSetState_t)GetProcAddress((HMODULE)dll, "XInputSetState");
+			_XInputGetCapabilities = (XInputGetCapabilities_t)GetProcAddress((HMODULE)dll, "XInputGetCapabilities");
+			if (!_XInputGetState || !_XInputSetState || !_XInputGetCapabilities) {
+				_XInputGetState = NULL;
+				_XInputSetState = NULL;
+				_XInputGetCapabilities = NULL;
+			}
+		}
 	}
 
 	if( mappings ) {
@@ -254,10 +278,12 @@ void gctrl_detect_thread(void *p) {
 		dx_gctrl_devices = NULL;
 
 		// XInput
-		for (int uid = XUSER_MAX_COUNT - 1; uid >= 0; uid--) {
-			XINPUT_CAPABILITIES capabilities;
-			if (XInputGetCapabilities(uid, XINPUT_FLAG_GAMEPAD, &capabilities) == ERROR_SUCCESS)
-				gctrl_xinput_add(uid, &current);
+		if (_XInputGetCapabilities) {
+			for (int uid = XUSER_MAX_COUNT - 1; uid >= 0; uid--) {
+				XINPUT_CAPABILITIES capabilities;
+				if (_XInputGetCapabilities(uid, XINPUT_FLAG_GAMEPAD, &capabilities) == ERROR_SUCCESS)
+					gctrl_xinput_add(uid, &current);
+			}
 		}
 
 		// DInput
@@ -332,7 +358,7 @@ HL_PRIM void HL_NAME(gctrl_set_vibration)(dx_gctrl_device *device, double streng
 	if( device->xUID >= 0 ){
 		XINPUT_VIBRATION vibration;
 		vibration.wLeftMotorSpeed = vibration.wRightMotorSpeed = (WORD)(strength * 65535);
-		XInputSetState(device->xUID, &vibration);
+		_XInputSetState(device->xUID, &vibration);
 	}
 }
 
