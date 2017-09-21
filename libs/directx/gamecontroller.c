@@ -1,9 +1,6 @@
 #define HL_NAME(n) directx_##n
 #include <hl.h>
-#include <xinput.h>
-#include <InitGuid.h>
-#define DIRECTINPUT_VERSION 0x0800
-#include <dinput.h>
+#include "gamecontroller.h"
 
 #define HAT_CENTERED    0x00
 #define HAT_UP          0x01
@@ -55,13 +52,9 @@ static CRITICAL_SECTION dx_gctrl_cs;
 static bool dx_gctrl_syncNeeded = FALSE;
 
 // XInput
-typedef DWORD(WINAPI *XInputGetCapabilities_t)(DWORD dwUserIndex, DWORD dwFlags, XINPUT_CAPABILITIES* pCapabilities);
-typedef DWORD(WINAPI *XInputGetState_t)(DWORD dwUserIndex, XINPUT_STATE* pState);
-typedef DWORD(WINAPI *XInputSetState_t)(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration);
-
-XInputGetCapabilities_t _XInputGetCapabilities = NULL;
-XInputGetState_t _XInputGetState = NULL;
-XInputSetState_t _XInputSetState = NULL;
+static XInputGetCapabilities_t _XInputGetCapabilities = NULL;
+static XInputGetState_t _XInputGetState = NULL;
+static XInputSetState_t _XInputSetState = NULL;
 
 // DirectInput specific
 static LPDIRECTINPUT8 gctrl_dinput = NULL;
@@ -114,9 +107,15 @@ static void gctrl_xinput_update(dx_gctrl_data *data) {
 
 static void gctrl_dinput_init( varray *mappings ) {
 	if( !gctrl_dinput ) {
-		HINSTANCE instance = GetModuleHandle(NULL);
-		if( instance )
-			DirectInput8Create(instance, DIRECTINPUT_VERSION, &IID_IDirectInput8, &gctrl_dinput, NULL);
+		HANDLE dll = LoadLibrary(L"dinput8.dll");
+		if( dll ) {
+			DirectInput8Create_t create = (DirectInput8Create_t)GetProcAddress((HMODULE)dll, "DirectInput8Create");
+			HINSTANCE instance = GetModuleHandle(NULL);
+			if( create && instance )
+				create(instance, DIRECTINPUT_VERSION, &IID_IDirectInput8, &gctrl_dinput, NULL);
+		} else {
+			printf("Warning: DirectInput DLL loading failed!\n");
+		}
 	}
 	if( !_XInputGetCapabilities ) {
 		HANDLE dll = LoadLibrary(L"XInput1_4.dll");
@@ -127,10 +126,13 @@ static void gctrl_dinput_init( varray *mappings ) {
 			_XInputSetState = (XInputSetState_t)GetProcAddress((HMODULE)dll, "XInputSetState");
 			_XInputGetCapabilities = (XInputGetCapabilities_t)GetProcAddress((HMODULE)dll, "XInputGetCapabilities");
 			if (!_XInputGetState || !_XInputSetState || !_XInputGetCapabilities) {
+				printf("Warning: Missing function in XInput DLL!\n");
 				_XInputGetState = NULL;
 				_XInputSetState = NULL;
 				_XInputGetCapabilities = NULL;
 			}
+		} else {
+			printf("Warning: XInput DLL loading failed!\n");
 		}
 	}
 
@@ -187,7 +189,7 @@ static BOOL CALLBACK gctrl_dinput_deviceCb(const DIDEVICEINSTANCE *instance, voi
 		return DIENUM_CONTINUE;
 	}
 
-	result = IDirectInputDevice8_SetDataFormat(device->dDevice, &c_dfDIJoystick2);
+	result = IDirectInputDevice8_SetDataFormat(device->dDevice, &_c_dfDIJoystick2);
 	if( FAILED(result) ) {
 		free(device);
 		return DIENUM_CONTINUE;
