@@ -145,19 +145,27 @@ static struct {
 	int pages_allocated;
 	int pages_blocks;
 	int mark_bytes;
-	int mark_time;
+	int64 mark_time;
 	int mark_count;
-	int alloc_time; // only measured if gc_profile active
+	int64 alloc_time; // only measured if gc_profile active
 } gc_stats = {0};
 
 static struct {
 	int64 total_allocated;
 	int64 allocation_count;
-	int alloc_time;
+	int64 alloc_time;
+	int64 timestamp;
 } last_profile;
 
 #ifdef HL_WIN
-#	define TIMESTAMP() ((int)GetTickCount())
+LARGE_INTEGER ts_time;
+LARGE_INTEGER ts_freq;
+static int64 TIMESTAMP() {
+	QueryPerformanceCounter(&ts_time);
+	ts_time.QuadPart *= 1000000;
+	ts_time.QuadPart /= ts_freq.QuadPart;
+	return ts_time.QuadPart;
+}
 #else
 #	define TIMESTAMP() 0
 #endif
@@ -569,7 +577,7 @@ static unsigned char *alloc_end = NULL;
 
 void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 	void *ptr;
-	int time = 0;
+	int64 time = 0;
 	int allocated = 0;
 #ifdef HL_BUMP_ALLOC
 	if( !alloc_all ) {
@@ -836,7 +844,7 @@ static void gc_mark() {
 }
 
 HL_API void hl_gc_major() {
-	int time = TIMESTAMP(), dt;
+	int64 time = TIMESTAMP(), dt;
 	gc_stats.last_mark = gc_stats.total_allocated;
 	gc_stats.last_mark_allocs = gc_stats.allocation_count;
 	gc_mark();
@@ -844,8 +852,9 @@ HL_API void hl_gc_major() {
 	gc_stats.mark_count++;
 	gc_stats.mark_time += dt;
 	if( gc_flags & GC_PROFILE ) {
-		printf("GC-PROFILE %d\n\tmark-time %.3g\n\talloc-time %.3g\n\ttotal-mark-time %.3g\n\ttotal-alloc-time %.3g\n\tallocated %d (%dKB)\n",
+		printf("GC-PROFILE %d\n\telapsed-time %.3g s\n\tmark-time %.3g ms\n\talloc-time %.3g ms\n\ttotal-mark-time %.3g ms\n\ttotal-alloc-time %.3g ms\n\tallocated %d (%dKB)\n",
 			gc_stats.mark_count,
+			(time - last_profile.timestamp) / 1000000.,
 			dt/1000.,
 			(gc_stats.alloc_time - last_profile.alloc_time)/1000.,
 			gc_stats.mark_time/1000.,
@@ -856,6 +865,7 @@ HL_API void hl_gc_major() {
 		last_profile.allocation_count = gc_stats.allocation_count;
 		last_profile.alloc_time = gc_stats.alloc_time;
 		last_profile.total_allocated = gc_stats.total_allocated;
+		last_profile.timestamp = time;
 	}
 }
 
@@ -882,6 +892,9 @@ static void gc_check_mark() {
 }
 
 static void hl_gc_init( void *stack_top ) {
+#ifdef HL_WIN
+	QueryPerformanceFrequency(&ts_freq);
+#endif
 	int i;
 	gc_stack_top = stack_top;
 	for(i=0;i<1<<GC_LEVEL0_BITS;i++)
