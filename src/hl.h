@@ -22,7 +22,7 @@
 #ifndef HL_H
 #define HL_H
 
-#define HL_VERSION	0x130
+#define HL_VERSION	0x140
 
 //WIN32 is defined in both windows and xbo
 #if defined(_WIN32)
