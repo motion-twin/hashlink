@@ -113,8 +113,10 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 	case EXCEPTION_DEBUG_EVENT:
 		switch( e.u.Exception.ExceptionRecord.ExceptionCode ) {
 		case EXCEPTION_BREAKPOINT:
+		case 0x4000001F: // STATUS_WX86_BREAKPOINT
 			return 1;
 		case EXCEPTION_SINGLE_STEP:
+		case 0x4000001E: // STATUS_WX86_SINGLE_STEP
 			return 2;
 		default:
 			return 3;
