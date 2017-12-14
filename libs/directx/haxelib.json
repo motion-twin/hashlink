@@ -6,5 +6,4 @@
 	"description" : "DirectX support for Haxe/HL.",
 	"version" : "1.4.0",
 	"releasenote" : "",
-	"dependencies": { "hlopenal" : "" }
 }
