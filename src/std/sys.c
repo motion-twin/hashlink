@@ -23,8 +23,8 @@
 
 #ifdef HL_CONSOLE
 #	include <posix/posix.h>
-#else
-
+#endif
+#if !defined( HL_CONSOLE) || defined(HL_WIN)
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -125,7 +125,7 @@ HL_PRIM vbyte *hl_sys_string() {
 }
 
 HL_PRIM vbyte *hl_sys_locale() {
-#ifdef HL_WIN
+#ifdef HL_WIN_DESKTOP
 	wchar_t loc[LOCALE_NAME_MAX_LENGTH];
 	int len = GetSystemDefaultLocaleName(loc,LOCALE_NAME_MAX_LENGTH);
 	return len == 0 ? NULL : hl_copy_bytes((vbyte*)loc,(len+1)*2);
@@ -183,7 +183,7 @@ HL_PRIM bool hl_sys_put_env( vbyte *e, vbyte *v ) {
 #	define environ (*_NSGetEnviron())
 #endif
 
-#ifdef HL_WIN
+#ifdef HL_WIN_DESKTOP
 #	undef environ
 #	define environ _wenviron
 #else
@@ -223,7 +223,7 @@ HL_PRIM varray *hl_sys_env() {
 
 HL_PRIM void hl_sys_sleep( double f ) {
 	hl_blocking(true);
-#if defined(HL_WIN)
+#if defined(_WIN32)
 	Sleep((DWORD)(f * 1000));
 #else
 	struct timespec t;
@@ -279,7 +279,7 @@ HL_PRIM bool hl_sys_is64() {
 }
 
 HL_PRIM int hl_sys_command( vbyte *cmd ) {
-#if defined(HL_WIN)
+#if defined(_WIN32)
 	int ret;
 	hl_blocking(true);
 	ret = system((pchar*)cmd);
@@ -301,7 +301,9 @@ HL_PRIM int hl_sys_command( vbyte *cmd ) {
 
 HL_PRIM bool hl_sys_exists( vbyte *path ) {
 	pstat st;
-	return stat((pchar*)path,&st) == 0;
+
+    int res = stat((pchar*)path, &st);
+	return res == 0;
 }
 
 HL_PRIM bool hl_sys_delete( vbyte *path ) {
@@ -397,7 +399,7 @@ HL_PRIM varray *hl_sys_read_dir( vbyte *_path ) {
 	varray *a = NULL;
 	pchar **current = NULL;
 
-#ifdef HL_WIN
+#ifdef _WIN32
 	WIN32_FIND_DATAW d;
 	HANDLE handle;
 	hl_buffer *b = hl_alloc_buffer();
@@ -461,7 +463,7 @@ HL_PRIM varray *hl_sys_read_dir( vbyte *_path ) {
 }
 
 HL_PRIM vbyte *hl_sys_full_path( vbyte *path ) {
-#if defined(HL_WIN)
+#if defined(_WIN32)
 	pchar out[MAX_PATH+1];
 	int len, i, last;
 	HANDLE handle;
@@ -529,7 +531,7 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 		return NULL;
 	return (vbyte*)pstrdup(path,-1);
 #elif defined(HL_CONSOLE)
-	return (vbyte*)sys_exe_path();
+	return sys_exe_path();
 #else
 	const pchar *p = getenv("_");
 	if( p != NULL )
@@ -546,7 +548,7 @@ HL_PRIM vbyte *hl_sys_exe_path() {
 }
 
 HL_PRIM int hl_sys_get_char( bool b ) {
-#	if defined(HL_WIN)
+#	if defined(HL_WIN_DESKTOP)
 	return b?getche():getch();
 #	elif defined(HL_CONSOLE)
 	return -1;
