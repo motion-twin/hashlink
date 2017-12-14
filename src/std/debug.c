@@ -174,7 +174,7 @@ DefineGetReg(CONTEXT,GetContextReg);
 
 
 HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 #	ifdef HL_64
 	if( !is64 ) {
 		WOW64_CONTEXT c;
@@ -200,8 +200,9 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 #	endif
 }
 
+
 HL_API bool hl_debug_write_register( int pid, int thread, int reg, void *value, bool is64 ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 #	ifdef HL_64
 	if( !is64 ) {
 		WOW64_CONTEXT c;
