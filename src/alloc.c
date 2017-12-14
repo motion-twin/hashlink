@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include "hl.h"
-#ifdef HL_WIN
+#ifdef _WIN32
 #	include <windows.h>
 #	include <intrin.h>
 static unsigned int __inline TRAILING_ONES( unsigned int x ) {

@@ -21,7 +21,8 @@
  */
 #include <hl.h>
 
-#ifdef HL_WIN
+
+#ifdef HL_WIN_DESKTOP
 static HANDLE last_process = NULL, last_thread = NULL;
 static int last_pid = -1;
 static int last_tid = -1;
@@ -52,7 +53,7 @@ static void CleanHandles() {
 #endif
 
 HL_API bool hl_debug_start( int pid ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	last_pid = -1;
 	return (bool)DebugActiveProcess(pid);
 #	else
@@ -61,7 +62,7 @@ HL_API bool hl_debug_start( int pid ) {
 }
 
 HL_API bool hl_debug_stop( int pid ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	BOOL b = DebugActiveProcessStop(pid);
 	CleanHandles();
 	return (bool)b;
@@ -71,7 +72,7 @@ HL_API bool hl_debug_stop( int pid ) {
 }
 
 HL_API bool hl_debug_breakpoint( int pid ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	return (bool)DebugBreakProcess(OpenPID(pid));
 #	else
 	return false;
@@ -79,7 +80,7 @@ HL_API bool hl_debug_breakpoint( int pid ) {
 }
 
 HL_API bool hl_debug_read( int pid, vbyte *addr, vbyte *buffer, int size ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	return (bool)ReadProcessMemory(OpenPID(pid),addr,buffer,size,NULL);
 #	else
 	return false;
@@ -87,7 +88,7 @@ HL_API bool hl_debug_read( int pid, vbyte *addr, vbyte *buffer, int size ) {
 }
 
 HL_API bool hl_debug_write( int pid, vbyte *addr, vbyte *buffer, int size ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	return (bool)WriteProcessMemory(OpenPID(pid),addr,buffer,size,NULL);
 #	else
 	return false;
@@ -95,7 +96,7 @@ HL_API bool hl_debug_write( int pid, vbyte *addr, vbyte *buffer, int size ) {
 }
 
 HL_API bool hl_debug_flush( int pid, vbyte *addr, int size ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	return (bool)FlushInstructionCache(OpenPID(pid),addr,size);
 #	else
 	return false;
@@ -103,7 +104,7 @@ HL_API bool hl_debug_flush( int pid, vbyte *addr, int size ) {
 }
 
 HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	DEBUG_EVENT e;
 	if( !WaitForDebugEvent(&e,timeout) )
 		return -1;
@@ -131,14 +132,14 @@ HL_API int hl_debug_wait( int pid, int *thread, int timeout ) {
 }
 
 HL_API bool hl_debug_resume( int pid, int thread ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 	return (bool)ContinueDebugEvent(pid, thread, DBG_CONTINUE);
 #	else
 	return false;
 #	endif
 }
 
-#ifdef HL_WIN
+#ifdef HL_WIN_DESKTOP
 #define DefineGetReg(type,GetFun) \
 	REGDATA *GetFun( type *c, int reg ) { \
 		switch( reg ) { \
@@ -172,7 +173,7 @@ DefineGetReg(CONTEXT,GetContextReg);
 
 
 HL_API void *hl_debug_read_register( int pit, int thread, int reg, bool is64 ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 #	ifdef HL_64
 	if( !is64 ) {
 		WOW64_CONTEXT c;
@@ -199,7 +200,7 @@ HL_API void *hl_debug_read_register( int pit, int thread, int reg, bool is64 ) {
 }
 
 HL_API bool hl_debug_write_register( int pit, int thread, int reg, void *value, bool is64 ) {
-#	ifdef HL_WIN
+#	ifdef HL_WIN_DESKTOP
 #	ifdef HL_64
 	if( !is64 ) {
 		WOW64_CONTEXT c;
