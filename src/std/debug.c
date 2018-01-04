@@ -174,11 +174,7 @@ DefineGetReg(CONTEXT,GetContextReg);
 #endif
 
 
-<<<<<<< HEAD
-HL_API void *hl_debug_read_register( int pit, int thread, int reg, bool is64 ) {
-=======
 HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
->>>>>>> 46a6b25... Added support for xbo
 #	ifdef HL_WIN_DESKTOP
 #	ifdef HL_64
 	if( !is64 ) {
@@ -205,11 +201,8 @@ HL_API void *hl_debug_read_register( int pid, int thread, int reg, bool is64 ) {
 #	endif
 }
 
-<<<<<<< HEAD
-HL_API bool hl_debug_write_register( int pit, int thread, int reg, void *value, bool is64 ) {
-=======
+
 HL_API bool hl_debug_write_register( int pid, int thread, int reg, void *value, bool is64 ) {
->>>>>>> 46a6b25... Added support for xbo
 #	ifdef HL_WIN_DESKTOP
 #	ifdef HL_64
 	if( !is64 ) {
