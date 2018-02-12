@@ -36,7 +36,7 @@ static int stack_count = 0;
 static bool exc_rethrow = false;
 
 HL_PRIM void *hl_fatal_error( const char *msg, const char *file, int line ) {
-	hl_is_blocking(true);
+	hl_blocking(true);
 #	ifdef HL_WIN_DESKTOP
     HWND consoleWnd = GetConsoleWindow();
     DWORD pid;

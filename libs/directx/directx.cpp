@@ -69,6 +69,9 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	desc.Windowed = true;
 	desc.OutputWindow = window;
 	if( restrictLevel >= maxLevels ) restrictLevel = maxLevels - 1;
+#if _DEBUG
+    flags |= D3D11_CREATE_DEVICE_INSTRUMENTED;
+#endif
 	d->init_flags = flags;
 	result = D3D11CreateDeviceAndSwapChain(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels + restrictLevel,maxLevels - restrictLevel,D3D11_SDK_VERSION,&desc,&d->swapchain,&d->device,&d->feature,&d->context);
 	if( result == DXGI_ERROR_SDK_COMPONENT_MISSING && (flags & D3D11_CREATE_DEVICE_DEBUG) != 0 ) {
@@ -135,11 +138,13 @@ HL_PRIM void HL_NAME(clear_color)( dx_pointer *rt, double r, double g, double b,
 	color[1] = (float)g;
 	color[2] = (float)b;
 	color[3] = (float)a;
-	driver->context->ClearRenderTargetView((ID3D11RenderTargetView*)rt,color);
+    ID3D11RenderTargetView* renderTarget = (ID3D11RenderTargetView*)rt;
+	driver->context->ClearRenderTargetView(renderTarget,color);
+    driver->context->OMSetRenderTargets(1, &renderTarget, nullptr);
 }
 
 HL_PRIM void HL_NAME(present)( int interval, int flags ) {
-    HRESULT res = driver->swapchain->Present(interval, flags); assert(res == S_OK);
+   HRESULT res = driver->swapchain->Present(interval, flags); assert(res == S_OK);
 }
 
 HL_PRIM const uchar *HL_NAME(get_device_name)() {
