@@ -110,7 +110,9 @@ HL_PRIM dx_pointer *HL_NAME(create_render_target_view)( dx_resource *r, dx_struc
 	return rt;
 }
 
+static ID3D11DepthStencilView* depthBuffer = NULL;
 HL_PRIM void HL_NAME(om_set_render_targets)( int count, dx_pointer **arr, dx_pointer *depth ) {
+    depthBuffer = (ID3D11DepthStencilView*)depth;
 	driver->context->OMSetRenderTargets(count,(ID3D11RenderTargetView**)arr,(ID3D11DepthStencilView*)depth);
 }
 
@@ -140,7 +142,7 @@ HL_PRIM void HL_NAME(clear_color)( dx_pointer *rt, double r, double g, double b,
 	color[3] = (float)a;
     ID3D11RenderTargetView* renderTarget = (ID3D11RenderTargetView*)rt;
 	driver->context->ClearRenderTargetView(renderTarget,color);
-    driver->context->OMSetRenderTargets(1, &renderTarget, nullptr);
+    driver->context->OMSetRenderTargets(1, &renderTarget, depthBuffer);
 }
 
 HL_PRIM void HL_NAME(present)( int interval, int flags ) {
