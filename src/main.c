@@ -41,6 +41,12 @@ typedef char pchar;
 #define pstrlen	strlen
 #endif
 
+#ifdef HL_MAC
+#	include <sys/syslimits.h>
+#	include <limits.h>
+#	include <mach-o/dyld.h>
+#endif
+
 static pchar *exe_path() {
 #if defined(HL_WIN)
 	static pchar path[MAX_PATH];
