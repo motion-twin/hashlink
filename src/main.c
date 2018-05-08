@@ -30,6 +30,7 @@ typedef uchar pchar;
 #define pcompare wcscmp
 #define ptoi(s)	wcstol(s,NULL,10)
 #define PSTR(x) USTR(x)
+#define pstrlen	ustrlen
 #else
 typedef char pchar;
 #define pprintf printf
@@ -37,7 +38,37 @@ typedef char pchar;
 #define pcompare strcmp
 #define ptoi atoi
 #define PSTR(x) x
+#define pstrlen	strlen
 #endif
+
+static pchar *exe_path() {
+#if defined(HL_WIN)
+	static pchar path[MAX_PATH];
+	if (GetModuleFileNameW(NULL, path, MAX_PATH) == 0)
+		return NULL;
+	return path;
+#elif defined(HL_MAC)
+	static pchar path[PATH_MAX + 1];
+	uint32_t path_len = PATH_MAX;
+	if (_NSGetExecutablePath(path, &path_len))
+		return NULL;
+	return path;
+#elif defined(HL_CONSOLE)
+	return sys_exe_path();
+#else
+	const pchar *p = getenv("_");
+	if (p != NULL)
+		return p;
+	{
+		static pchar path[PATH_MAX];
+		int length = readlink("/proc/self/exe", path, sizeof(path));
+		if (length < 0)
+			return NULL;
+		path[length] = '\0';
+		return path;
+	}
+#endif
+}
 
 static char *load_file(const pchar *file, int *fsize) {
 	FILE *f = pfopen(file, "rb");
@@ -209,6 +240,19 @@ int main(int argc, pchar *argv[]) {
 		FILE *fchk;
 		file = PSTR("hlboot.dat");
 		fchk = pfopen(file,"rb");
+		if (fchk == NULL) {
+			pchar *epath = exe_path();
+#ifdef HL_WIN
+			int len = wcsrchr(epath, '\\') - epath + 1;
+#else
+			int len = strrchr(epath, '/') - epath + 1;
+#endif
+			pchar *path = malloc((len + pstrlen(file) + 1) * sizeof(pchar));
+			memcpy(path, epath, len * sizeof(pchar));
+			memcpy(path + len, file, (pstrlen(file)+1) * sizeof(pchar));
+			file = path;
+			fchk = pfopen(file, "rb");
+		}
 		if( fchk == NULL ) {
 			printf("HL/JIT %d.%d.%d (c)2015-2017 Haxe Foundation\n  Usage : hl [--debug <port>] <file>\n",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
 			return 1;
