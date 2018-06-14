@@ -43,8 +43,10 @@ typedef char pchar;
 
 #ifdef HL_MAC
 #	include <sys/syslimits.h>
-#	include <limits.h>
 #	include <mach-o/dyld.h>
+#endif
+#ifndef HL_WIN
+#	include <limits.h>
 #endif
 
 static pchar *exe_path() {
