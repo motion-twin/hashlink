@@ -113,7 +113,7 @@
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../include/sdl/include;../../src;../../include/gl</IncludePath>
-    <LibraryPath>..\..\include\sdl\lib\$(Platform)\;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;..\..\$(Configuration);</LibraryPath>
+    <LibraryPath>..\..\include\sdl\lib\x86\;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;..\..\$(Configuration);</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseVS2013|Win32'">
     <LinkIncremental>false</LinkIncremental>
