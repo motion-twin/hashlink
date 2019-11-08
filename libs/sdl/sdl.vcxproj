@@ -30,7 +30,7 @@
     <ProjectGuid>{12049F27-EA26-4A33-ADF8-E542C4167C00}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>sdl</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -119,7 +119,7 @@
     <LinkIncremental>false</LinkIncremental>
     <TargetExt>.hdll</TargetExt>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../../include/sdl/include;../../src;../../include/gl</IncludePath>
-    <LibraryPath>..\..\include\sdl\lib\$(Platform)\;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;..\..\$(Configuration);</LibraryPath>
+    <LibraryPath>..\..\include\sdl\lib\x86\;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86);$(NETFXKitsDir)Lib\um\x86;..\..\$(Configuration);</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
