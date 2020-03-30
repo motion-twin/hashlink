@@ -1,6 +1,6 @@
 
 LBITS := $(shell getconf LONG_BIT)
-ARCH ?= $(LBITS)
+MARCH ?= $(LBITS)
 PREFIX ?= /usr/local
 INSTALL_DIR ?= $(PREFIX)
 
@@ -19,14 +19,14 @@ PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/p
 	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o \
 	include/pcre/pcre16_ord2utf16.o include/pcre/pcre16_valid_utf16.o include/pcre/pcre_ucd.o
 
-RUNTIME = src/alloc.o
+RUNTIME = src/gc.o
 
 STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o src/std/debug.o \
 	src/std/file.o src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/random.o src/std/regexp.o \
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o
+HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
 
 FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o libs/fmt/dxt.o
 
@@ -55,7 +55,7 @@ LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
 RELEASE_NAME=win
 
-ifeq ($(ARCH),32)
+ifeq ($(MARCH),32)
 CC=i686-pc-cygwin-gcc
 endif
 
@@ -63,7 +63,7 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(ARCH) -I /opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
+CFLAGS += -m$(MARCH) -I /usr/local/opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
 
 ifdef OSX_SDK
@@ -72,7 +72,7 @@ CFLAGS += -isysroot $(ISYSROOT)
 LFLAGS += -isysroot $(ISYSROOT)
 endif
 
-LIBFLAGS += -L/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
+LIBFLAGS += -L/usr/local/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
@@ -81,11 +81,11 @@ RELEASE_NAME = osx
 else
 
 # Linux
-CFLAGS += -m$(ARCH) -fPIC -pthread
+CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
 CFLAGS += -I /usr/include/libpng16
-LFLAGS += -lm -Wl,--export-dynamic -Wl,--no-undefined
+LFLAGS += -lm -Wl,-rpath,. -Wl,--export-dynamic -Wl,--no-undefined
 
-ifeq ($(ARCH),32)
+ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
 LIBFLAGS += -L/opt/libjpeg-turbo/lib
 else
@@ -125,7 +125,7 @@ uninstall:
 libs: $(LIBS)
 
 libhl: ${LIB}
-	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
+	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
 hlc: ${BOOT}
 	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
@@ -186,8 +186,8 @@ release_haxelib_package:
 	rm -rf $(HLIB)_release	
 	
 release_win:
-	(cd ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../hl-$(HL_VER))
-	cp c:/windows/syswow64/msvcr120.dll hl-$(HL_VER)
+	(cd x64/ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
+	cp c:/windows/system32/msvcr120.dll hl-$(HL_VER)
 	cp `which SDL2.dll` hl-$(HL_VER)
 	cp `which OpenAL32.dll` hl-$(HL_VER)
 	zip -r hl-$(HL_VER).zip hl-$(HL_VER)

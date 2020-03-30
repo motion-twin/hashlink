@@ -27,7 +27,7 @@
 	https://github.com/HaxeFoundation/hashlink/wiki/
 **/
 
-#define HL_VERSION	0x010A00
+#define HL_VERSION	0x010B00
 
 #if defined(_WIN32)
 #	define HL_WIN
@@ -589,6 +589,7 @@ HL_API vdynamic *hl_alloc_strbytes( const uchar *msg, ... );
 HL_API void hl_assert( void );
 HL_API HL_NO_RETURN( void hl_throw( vdynamic *v ) );
 HL_API HL_NO_RETURN( void hl_rethrow( vdynamic *v ) );
+HL_API HL_NO_RETURN( void hl_null_access( void ) );
 HL_API void hl_setup_longjump( void *j );
 HL_API void hl_setup_exception( void *resolve_symbol, void *capture_stack );
 HL_API void hl_dump_stack( void );
@@ -842,7 +843,8 @@ struct _hl_trap_ctx {
 #define HL_EXC_CATCH_ALL	2
 #define HL_EXC_IS_THROW		4
 #define HL_THREAD_INVISIBLE	16
-#define HL_TREAD_TRACK_SHIFT 5
+#define HL_THREAD_PROFILER_PAUSED 32
+#define HL_TREAD_TRACK_SHIFT 16
 
 #define HL_TRACK_ALLOC		1
 #define HL_TRACK_CAST		2

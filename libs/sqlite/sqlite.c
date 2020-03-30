@@ -59,7 +59,7 @@ static void HL_NAME(finalize_request)(sqlite_result *r, bool exc ) {
 	r->bools = NULL;
 }
 static void HL_NAME(finalize_result)(sqlite_result *r ) {
-	if (r) HL_NAME(finalize_request)(r, false);
+	if (r && r->db) HL_NAME(finalize_request)(r, false);
 }
 
 /**
@@ -72,9 +72,10 @@ HL_PRIM void HL_NAME(close)( sqlite_database *db ) {
 	if (sqlite3_close(db->db) != SQLITE_OK) {
 		// No exception : we shouldn't alloc memory in a finalizer anyway
 	}
+	db->db = NULL;
 }
 static void HL_NAME(finalize_database)( sqlite_database *db ) {
-	if (db) HL_NAME(close)(db);
+	if (db && db->db) HL_NAME(close)(db);
 }
 
 
@@ -114,7 +115,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 
 	r = (sqlite_result*)hl_gc_alloc_finalizer(sizeof(sqlite_result));
 	r->finalize = HL_NAME(finalize_result);
-	r->db = db;
+	r->db = NULL;
 	
 	if( sqlite3_prepare16_v2(db->db, sql, -1, &r->r, &tl) != SQLITE_OK ) {
 		HL_NAME(error)(db->db, false);
@@ -125,6 +126,7 @@ HL_PRIM sqlite_result *HL_NAME(request)(sqlite_database *db, vbyte *sql ) {
 		hl_error("SQLite error: Cannot execute several SQL requests at the same time");
 	}
 
+	r->db = db;
 	r->ncols = sqlite3_column_count(r->r);
 	r->names = (int*)malloc(sizeof(int)*r->ncols);
 	r->bools = (int*)malloc(sizeof(int)*r->ncols);
@@ -235,13 +237,21 @@ HL_PRIM varray *HL_NAME(result_next)( sqlite_result *r ) {
 			case SQLITE_TEXT:
 			{
 				uchar *text16 = (uchar *)sqlite3_column_text16(r->r, i);
-				v = hl_make_dyn(&text16, &hlt_bytes);
+				vbyte *vb = hl_copy_bytes((vbyte *)text16, (int)(ustrlen(text16) + 1) * sizeof(uchar));
+				v = hl_make_dyn(&vb, &hlt_bytes);
 				break;
 			}
 			case SQLITE_BLOB:
 			{
+				int size = sqlite3_column_bytes(r->r, i);
 				vbyte *blob = (vbyte *)sqlite3_column_blob(r->r, i);
-				v = hl_make_dyn(&blob, &hlt_bytes);
+				vbyte *vb = hl_copy_bytes(blob, size+1);
+				
+				varray *bytes_data = hl_alloc_array(&hlt_dyn, 2);
+				hl_aptr(bytes_data, vdynamic*)[0] = hl_make_dyn(&vb, &hlt_bytes);
+				hl_aptr(bytes_data, vdynamic*)[1] = hl_make_dyn(&size, &hlt_i32);
+				
+				v = hl_make_dyn(&bytes_data, &hlt_array);
 				break;
 			}
 			default:

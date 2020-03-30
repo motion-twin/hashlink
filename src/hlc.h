@@ -44,6 +44,9 @@
 #undef STRICT
 #undef TRUE
 #undef FALSE
+#undef CW_USEDEFAULT
+#undef HIDDEN
+#undef RESIZABLE
 
 // disable some warnings triggered by HLC code generator
 
@@ -73,11 +76,6 @@
 #	pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #	endif
 #endif
-
-static void hl_null_access() {
-	hl_error("Null access");
-	HL_UNREACHABLE;
-}
 
 #endif
 
