@@ -223,7 +223,12 @@ static LRESULT CALLBACK WndProc( HWND wnd, UINT umsg, WPARAM wparam, LPARAM lpar
 		shift_downs[1] = false;
 		addState(Blur);
 		break;
-	case WM_WINDOWPOSCHANGED:
+	// The following case used to be WM_WINDOWPOSCHANGED, which was buggy: when the window isn't focused
+	// and you start grabbing the title bar, the window would fly off the screen. updateClipCursor
+	// would "fight" against the window manager resetting the cursor position within the title bar
+	// (outside of the clip region). The workaround is to call updateClipCursor once the window has
+	// finished moving (WM_EXITSIZEMOVE).
+	case WM_EXITSIZEMOVE:
 		updateClipCursor(wnd);
 		break;
 	case WM_GETMINMAXINFO:
