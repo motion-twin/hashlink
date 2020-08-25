@@ -284,6 +284,20 @@ HL_PRIM void HL_NAME(ui_close_console)() {
 	FreeConsole();
 }
 
+HL_PRIM int HL_NAME(ui_is_window_open)(const char *title) {
+	HWND win;	
+	wchar_t  *ws;
+	int len;
+	//
+	len = strlen(title) + 1;
+	ws = (wchar_t *) malloc(sizeof(wchar_t) * len);
+	memset(ws, 0, sizeof(wchar_t) * len);
+	//convert to wchar_t
+	swprintf(ws, len, L"%hs", title);
+	// check if a window exists with that title name (class does not seem to work - 1st argument)
+	win = FindWindow(NULL, ws);
+	return (win == NULL) ? 0 : 1;
+}
 
 HL_PRIM vbyte *HL_NAME(ui_choose_file)( bool forSave, vdynamic *options ) {
 	wref *win = (wref*)hl_dyn_getp(options,hl_hash_utf8("window"), &hlt_abstract);
@@ -349,3 +363,4 @@ DEFINE_PRIM(_VOID, ui_sentinel_pause, _SENTINEL _BOOL);
 DEFINE_PRIM(_BOOL, ui_sentinel_is_paused, _SENTINEL);
 
 DEFINE_PRIM(_BYTES, ui_choose_file, _BOOL _DYN);
+DEFINE_PRIM(_BOOL, ui_is_window_open, _BYTES);
