@@ -98,6 +98,11 @@ HL_PRIM dx_driver *HL_NAME(create)( HWND window, int format, int flags, int rest
 	result = D3D11CreateDeviceAndSwapChain(NULL,D3D_DRIVER_TYPE_HARDWARE,NULL,flags,levels + restrictLevel,maxLevels - restrictLevel,D3D11_SDK_VERSION,&desc,&d->swapchain,&d->device,&d->feature,&d->context);
 
 #ifdef HL_WIN_DESKTOP
+	if( result == E_INVALIDARG ) {
+		// disable flags not available in DX<11.1
+		flags &= ~D3D11_CREATE_DEVICE_DISABLE_GPU_TIMEOUT;
+		d->init_flags = flags;
+	}
 	if( result == DXGI_ERROR_SDK_COMPONENT_MISSING && (flags & D3D11_CREATE_DEVICE_DEBUG) != 0 ) {
 		// no debug driver available, retry
 		flags &= ~D3D11_CREATE_DEVICE_DEBUG;
@@ -292,6 +297,10 @@ HL_PRIM void HL_NAME(draw_indexed)( int count, int start, int baseVertex ) {
 	driver->context->DrawIndexed(count,start,baseVertex);
 }
 
+HL_PRIM void HL_NAME(draw_indexed_instanced)( int indexCountPerInstance, int instanceCount, int startIndexLocation, int baseVertexLocation, int startInstanceLocation ) {
+	driver->context->DrawIndexedInstanced(indexCountPerInstance, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+}
+
 HL_PRIM void HL_NAME(draw_indexed_instanced_indirect)( dx_resource *r, int offset ) {
 	driver->context->DrawIndexedInstancedIndirect((ID3D11Buffer*)r, (UINT)offset);
 }
@@ -463,6 +472,7 @@ DEFINE_PRIM(_BYTES, disassemble_shader, _BYTES _I32 _I32 _BYTES _REF(_I32));
 DEFINE_PRIM(_POINTER, create_vertex_shader, _BYTES _I32);
 DEFINE_PRIM(_POINTER, create_pixel_shader, _BYTES _I32);
 DEFINE_PRIM(_VOID, draw_indexed, _I32 _I32 _I32);
+DEFINE_PRIM(_VOID, draw_indexed_instanced, _I32 _I32 _I32 _I32 _I32);
 DEFINE_PRIM(_VOID, draw_indexed_instanced_indirect, _RESOURCE _I32);
 DEFINE_PRIM(_VOID, vs_set_shader, _POINTER);
 DEFINE_PRIM(_VOID, vs_set_constant_buffers, _I32 _I32 _REF(_RESOURCE));

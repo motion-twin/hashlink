@@ -26,7 +26,9 @@
 #endif
 
 #ifdef HL_WIN_DESKTOP
+# ifndef CONST
 #	define CONST
+# endif
 #	pragma warning(disable:4091)
 #if !defined(HL_MINGW)
 #	include <DbgHelp.h>
@@ -103,6 +105,12 @@ static int throw_handler( int code ) {
 	#else
 	return 0;
 	#endif
+}
+#endif
+
+#if defined(HL_WIN_DESKTOP) && !defined(_CONSOLE)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	return wmain(__argc, __argv);
 }
 #endif
 

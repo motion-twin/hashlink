@@ -37,18 +37,27 @@ typedef struct {
 	int *extra;
 } hl_opcode;
 
-typedef struct {
+typedef struct hl_function hl_function;
+
+struct hl_function {
 	int findex;
 	int nregs;
 	int nops;
+	int ref;
 	hl_type *type;
 	hl_type **regs;
 	hl_opcode *ops;
 	int *debug;
 
 	hl_type_obj *obj;
-	const uchar *field;
-} hl_function;
+	union {
+		const uchar *name;
+		hl_function *ref; // obj = NULL
+	} field;
+};
+
+#define fun_obj(f) ((f)->obj ? (f)->obj : (f)->field.ref ? (f)->field.ref->obj : NULL)
+#define fun_field_name(f) ((f)->obj ? (f)->field.name : (f)->field.ref ? (f)->field.ref->field.name : NULL)
 
 typedef struct {
 	int global;
@@ -94,32 +103,59 @@ typedef struct {
 	bool large;
 } hl_debug_infos;
 
+typedef struct jit_ctx jit_ctx;
+
+
+typedef struct {
+	hl_code *code;
+	int *types_hashes;
+	int *globals_signs;
+	int *functions_signs;
+	int *functions_hashes;
+	int *functions_indexes;
+} hl_code_hash;
+
 typedef struct {
 	hl_code *code;
 	int codesize;
+	int globals_size;
 	int *globals_indexes;
 	unsigned char *globals_data;
 	void **functions_ptrs;
 	int *functions_indexes;
 	void *jit_code;
+	hl_code_hash *hash;
 	hl_debug_infos *jit_debug;
+	jit_ctx *jit_ctx;
 	hl_module_context ctx;
 } hl_module;
 
-typedef struct jit_ctx jit_ctx;
+hl_code *hl_code_read( const unsigned char *data, int size, char **error_msg );
 
-hl_code *hl_code_read( const unsigned char *data, int size );
+hl_code_hash *hl_code_hash_alloc( hl_code *c );
+void hl_code_hash_finalize( hl_code_hash *h );
+void hl_code_hash_free( hl_code_hash *h );
 void hl_code_free( hl_code *c );
+int hl_code_hash_type( hl_code_hash *h, hl_type *t );
+void hl_code_hash_remap_globals( hl_code_hash *hnew, hl_code_hash *hold );
+
 const uchar *hl_get_ustring( hl_code *c, int index );
 const char* hl_op_name( int op );
 
+typedef unsigned char h_bool;
 hl_module *hl_module_alloc( hl_code *code );
-int hl_module_init( hl_module *m );
+int hl_module_init( hl_module *m, h_bool hot_reload );
+h_bool hl_module_patch( hl_module *m, hl_code *code );
 void hl_module_free( hl_module *m );
-bool hl_module_debug( hl_module *m, int port, bool wait );
+h_bool hl_module_debug( hl_module *m, int port, h_bool wait );
+
+void hl_profile_setup( int sample_count );
+void hl_profile_end();
 
 jit_ctx *hl_jit_alloc();
-void hl_jit_free( jit_ctx *ctx );
+void hl_jit_free( jit_ctx *ctx, h_bool can_reset );
+void hl_jit_reset( jit_ctx *ctx, hl_module *m );
 void hl_jit_init( jit_ctx *ctx, hl_module *m );
 int hl_jit_function( jit_ctx *ctx, hl_module *m, hl_function *f );
-void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug );
+void *hl_jit_code( jit_ctx *ctx, hl_module *m, int *codesize, hl_debug_infos **debug, hl_module *previous );
+void hl_jit_patch_method( void *old_fun, void **new_fun_table );

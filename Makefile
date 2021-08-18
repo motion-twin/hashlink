@@ -1,13 +1,17 @@
 
 LBITS := $(shell getconf LONG_BIT)
-ARCH ?= $(LBITS)
+MARCH ?= $(LBITS)
 PREFIX ?= /usr/local
 INSTALL_DIR ?= $(PREFIX)
+INSTALL_BIN_DIR ?= $(PREFIX)/bin
+INSTALL_LIB_DIR ?= $(PREFIX)/lib
+INSTALL_INCLUDE_DIR ?= $(PREFIX)/include
 
 LIBS=fmt sdl ssl openal ui uv mysql
 
-CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include/pcre -I include/mikktspace -D LIBHL_EXPORTS
+CFLAGS = -Wall -O3 -I src -msse2 -mfpmath=sse -std=c11 -I include -I include/pcre -I include/mikktspace -I include/minimp3 -D LIBHL_EXPORTS
 LFLAGS = -L. -lhl
+EXTRA_LFLAGS ?=
 LIBFLAGS =
 HLFLAGS = -ldl
 LIBEXT = so
@@ -19,16 +23,16 @@ PCRE = include/pcre/pcre_chartables.o include/pcre/pcre_compile.o include/pcre/p
 	include/pcre/pcre_newline.o include/pcre/pcre_string_utils.o include/pcre/pcre_tables.o include/pcre/pcre_xclass.o \
 	include/pcre/pcre16_ord2utf16.o include/pcre/pcre16_valid_utf16.o include/pcre/pcre_ucd.o
 
-RUNTIME = src/alloc.o
+RUNTIME = src/gc.o
 
 STD = src/std/array.o src/std/buffer.o src/std/bytes.o src/std/cast.o src/std/date.o src/std/error.o src/std/debug.o \
 	src/std/file.o src/std/fun.o src/std/maps.o src/std/math.o src/std/obj.o src/std/random.o src/std/regexp.o \
 	src/std/socket.o src/std/string.o src/std/sys.o src/std/types.o src/std/ucs2.o src/std/thread.o src/std/process.o \
 	src/std/track.o
 
-HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o
+HL = src/code.o src/jit.o src/main.o src/module.o src/debugger.o src/profile.o
 
-FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o
+FMT = libs/fmt/fmt.o libs/fmt/sha1.o include/mikktspace/mikktspace.o libs/fmt/mikkt.o libs/fmt/dxt.o
 
 SDL = libs/sdl/sdl.o libs/sdl/gl.o
 
@@ -55,7 +59,7 @@ LIBFLAGS += -Wl,--export-all-symbols
 LIBEXT = dll
 RELEASE_NAME=win
 
-ifeq ($(ARCH),32)
+ifeq ($(MARCH),32)
 CC=i686-pc-cygwin-gcc
 endif
 
@@ -63,22 +67,33 @@ else ifeq ($(UNAME),Darwin)
 
 # Mac
 LIBEXT=dylib
-CFLAGS += -m$(ARCH) -I /opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/include -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft
+CFLAGS += -m$(MARCH) -I /usr/local/include -I /usr/local/opt/libjpeg-turbo/include -I /usr/local/opt/jpeg-turbo/include -I /usr/local/opt/sdl2/include/SDL2 -I /usr/local/opt/libvorbis/include -I /usr/local/opt/openal-soft/include -Dopenal_soft  -DGL_SILENCE_DEPRECATION
 LFLAGS += -Wl,-export_dynamic -L/usr/local/lib
-LIBFLAGS += -L/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
+
+ifdef OSX_SDK
+ISYSROOT = $(shell xcrun --sdk macosx$(OSX_SDK) --show-sdk-path)
+CFLAGS += -isysroot $(ISYSROOT)
+LFLAGS += -isysroot $(ISYSROOT)
+endif
+
+LIBFLAGS += -L/usr/local/opt/libjpeg-turbo/lib -L/usr/local/opt/jpeg-turbo/lib -L/usr/local/lib -L/usr/local/opt/libvorbis/lib -L/usr/local/opt/openal-soft/lib
 LIBOPENGL = -framework OpenGL
 LIBOPENAL = -lopenal
 LIBSSL = -framework Security -framework CoreFoundation
 RELEASE_NAME = osx
 
+# Mac native debug
+HL_DEBUG = include/mdbg/mdbg.o include/mdbg/mach_excServer.o include/mdbg/mach_excUser.o
+LIB += ${HL_DEBUG}
+
 else
 
 # Linux
-CFLAGS += -m$(ARCH) -fPIC -pthread
-CFLAGS += -I /usr/include/libpng16
-LFLAGS += -lm -Wl,--export-dynamic -Wl,--no-undefined
+CFLAGS += -m$(MARCH) -fPIC -pthread -fno-omit-frame-pointer
+CFLAGS += -I /usr/include/libpng16 # Maybe not used
+LFLAGS += -lm -Wl,-rpath,. -Wl,--export-dynamic -Wl,--no-undefined
 
-ifeq ($(ARCH),32)
+ifeq ($(MARCH),32)
 CFLAGS += -I /usr/include/i386-linux-gnu
 LIBFLAGS += -L/opt/libjpeg-turbo/lib
 else
@@ -102,32 +117,36 @@ endif
 all: libhl hl libs
 
 install:
-	mkdir -p $(INSTALL_DIR)
-	mkdir -p $(INSTALL_DIR)/bin
-	mkdir -p $(INSTALL_DIR)/lib
-	mkdir -p $(INSTALL_DIR)/include
-	cp hl $(INSTALL_DIR)/bin
-	cp libhl.${LIBEXT} $(INSTALL_DIR)/lib
-	cp *.hdll $(INSTALL_DIR)/lib
-	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_DIR)/include
+	$(UNAME)==Darwin && make uninstall
+	mkdir -p $(INSTALL_BIN_DIR)
+	cp hl $(INSTALL_BIN_DIR)
+	mkdir -p $(INSTALL_LIB_DIR)
+	cp *.hdll $(INSTALL_LIB_DIR)
+	cp libhl.${LIBEXT} $(INSTALL_LIB_DIR)
+	mkdir -p $(INSTALL_INCLUDE_DIR)
+	cp src/hl.h src/hlc.h src/hlc_main.c $(INSTALL_INCLUDE_DIR)
 
 uninstall:
-	rm -f $(INSTALL_DIR)/bin/hl $(INSTALL_DIR)/lib/libhl.${LIBEXT} $(INSTALL_DIR)/lib/*.hdll
-	rm -f $(INSTALL_DIR)/include/hl.h $(INSTALL_DIR)/include/hlc.h $(INSTALL_DIR)/include/hlc_main.c
+	rm -f $(INSTALL_BIN_DIR)/hl $(INSTALL_LIB_DIR)/libhl.${LIBEXT} $(INSTALL_LIB_DIR)/*.hdll
+	rm -f $(INSTALL_INCLUDE_DIR)/hl.h $(INSTALL_INCLUDE_DIR)/hlc.h $(INSTALL_INCLUDE_DIR)/hlc_main.c
 
 libs: $(LIBS)
 
 libhl: ${LIB}
-	${CC} -o libhl.$(LIBEXT) -m${ARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
+	${CC} -o libhl.$(LIBEXT) -m${MARCH} ${LIBFLAGS} -shared ${LIB} -lpthread -lm
 
 hlc: ${BOOT}
-	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS}
+	${CC} ${CFLAGS} -o hlc ${BOOT} ${LFLAGS} ${EXTRA_LFLAGS}
 
 hl: ${HL} libhl
-	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${HLFLAGS}
+	${CC} ${CFLAGS} -o hl ${HL} ${LFLAGS} ${EXTRA_LFLAGS} ${HLFLAGS}
 
 fmt: ${FMT} libhl
+<<<<<<< HEAD
 	${CC} ${CFLAGS} -I include/mikktspace -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl $(LIBPNG) $(LIBTURBOJPEG) -lz -lvorbisfile
+=======
+	${CC} ${CFLAGS} -I include/mikktspace -I include/minimp3 -shared -o fmt.hdll ${FMT} ${LIBFLAGS} -L. -lhl -lpng $(LIBTURBOJPEG) -lz -lvorbisfile
+>>>>>>> 10733ee862d28d901fc34b924dc2f3582c316bc8
 
 sdl: ${SDL} libhl
 	${CC} ${CFLAGS} -shared -o sdl.hdll ${SDL} ${LIBFLAGS} -L. -lhl -lSDL2 $(LIBOPENGL)
@@ -146,14 +165,14 @@ uv: ${UV} libhl
 
 mysql: ${MYSQL} libhl
 	${CC} ${CFLAGS} -shared -o mysql.hdll ${MYSQL} ${LIBFLAGS} -L. -lhl
-	
+
 mesa:
 	(cd libs/mesa && make)
 
 release: release_version release_$(RELEASE_NAME)
 
 release_version:
-	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))	
+	$(eval HL_VER := `(hl --version)`-$(RELEASE_NAME))
 	rm -rf hl-$(HL_VER)
 	mkdir hl-$(HL_VER)
 	mkdir hl-$(HL_VER)/include
@@ -169,18 +188,18 @@ HLPACK=dx
 else
 HLPACK=$(HLIB)
 endif
-	
+
 release_haxelib_package:
 	rm -rf $(HLIB)_release
 	mkdir $(HLIB)_release
 	(cd libs/$(HLIB) && cp -R $(HLPACK) *.h *.c* haxelib.json ../../$(HLIB)_release | true)
 	zip -r $(HLIB).zip $(HLIB)_release
 	haxelib submit $(HLIB).zip
-	rm -rf $(HLIB)_release	
-	
+	rm -rf $(HLIB)_release
+
 release_win:
-	(cd ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../hl-$(HL_VER))
-	cp c:/windows/syswow64/msvcr120.dll hl-$(HL_VER)
+	(cd x64/ReleaseVS2013 && cp hl.exe libhl.dll *.hdll *.lib ../../hl-$(HL_VER))
+	cp c:/windows/system32/msvcr120.dll hl-$(HL_VER)
 	cp `which SDL2.dll` hl-$(HL_VER)
 	cp `which OpenAL32.dll` hl-$(HL_VER)
 	zip -r hl-$(HL_VER).zip hl-$(HL_VER)
@@ -196,13 +215,22 @@ release_osx:
 	tar -czf hl-$(HL_VER).tgz hl-$(HL_VER)
 	rm -rf hl-$(HL_VER)
 
+codesign_osx:
+	sudo security delete-identity -c hl-cert || echo
+	echo "[req]\ndistinguished_name=codesign_dn\n[codesign_dn]\ncommonName=hl-cert\n[v3_req]\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning" > openssl.cnf
+	openssl req -x509 -newkey rsa:4096 -keyout key.pem -nodes -days 365 -subj '/CN=hl-cert' -outform der -out cert.cer -extensions v3_req -config openssl.cnf
+	sudo security add-trusted-cert -d -k /Library/Keychains/System.keychain cert.cer
+	sudo security import key.pem -k /Library/Keychains/System.keychain -A
+	codesign --entitlements other/osx/entitlements.xml -fs hl-cert hl
+	rm key.pem cert.cer openssl.cnf
+
 .SUFFIXES : .c .o
 
 .c.o :
 	${CC} ${CFLAGS} -o $@ -c $<
 
 clean_o:
-	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV}
+	rm -f ${STD} ${BOOT} ${RUNTIME} ${PCRE} ${HL} ${FMT} ${SDL} ${SSL} ${OPENAL} ${UI} ${UV} ${HL_DEBUG}
 
 clean: clean_o
 	rm -f hl hl.exe libhl.$(LIBEXT) *.hdll

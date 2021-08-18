@@ -32,6 +32,7 @@ typedef uchar pchar;
 #define PSTR(x) USTR(x)
 #define pstrlen	ustrlen
 #else
+#	include <sys/stat.h>
 typedef char pchar;
 #define pprintf printf
 #define pfopen fopen
@@ -41,6 +42,7 @@ typedef char pchar;
 #define pstrlen	strlen
 #endif
 
+
 #ifdef HL_MAC
 #	include <sys/syslimits.h>
 #	include <mach-o/dyld.h>
@@ -48,6 +50,27 @@ typedef char pchar;
 #ifndef HL_WIN
 #	include <limits.h>
 #endif
+
+typedef struct {
+	hl_code *code;
+	hl_module *m;
+	vdynamic *ret;
+	pchar *file;
+	int file_time;
+} main_context;
+
+static int pfiletime( pchar *file )	{
+#ifdef HL_WIN
+	struct _stat32 st;
+	_wstat32(file,&st);
+	return (int)st.st_mtime;
+#else
+	struct stat st;
+	stat(file,&st);
+	return (int)st.st_mtime;
+#endif
+}
+
 
 static pchar *exe_path() {
 #if defined(HL_WIN)
@@ -158,14 +181,49 @@ hl_code *try_load_embedded_module() {
 	return code;
 }
 
-static hl_code *load_code( const pchar *file ) {
+
+
+static hl_code *load_code( const pchar *file, char **error_msg, bool print_errors ) {
 	hl_code *code;
-	int size;
-	char *fdata = load_file(file, &size);
-	if (fdata == NULL) return NULL;
-	code = hl_code_read((unsigned char*)fdata, size);
+	FILE *f = pfopen(file,"rb");
+	int pos, size;
+	char *fdata;
+	if( f == NULL ) {
+		if( print_errors ) pprintf("File not found '%s'\n",file);
+		return NULL;
+	}
+	fseek(f, 0, SEEK_END);
+	size = (int)ftell(f);
+	fseek(f, 0, SEEK_SET);
+	fdata = (char*)malloc(size);
+	pos = 0;
+	while( pos < size ) {
+		int r = (int)fread(fdata + pos, 1, size-pos, f);
+		if( r <= 0 ) {
+			if( print_errors ) pprintf("Failed to read '%s'\n",file);
+			return NULL;
+		}
+		pos += r;
+	}
+	fclose(f);
+	code = hl_code_read((unsigned char*)fdata, size, error_msg);
 	free(fdata);
 	return code;
+}
+
+static bool check_reload( main_context *m ) {
+	int time = pfiletime(m->file);
+	bool changed;
+	if( time == m->file_time )
+		return false;
+	char *error_msg = NULL;
+	hl_code *code = load_code(m->file, &error_msg, false);
+	if( code == NULL )
+		return false;
+	changed = hl_module_patch(m->m, code);
+	m->file_time = time;
+	hl_code_free(code);
+	return changed;
 }
 
 #ifdef HL_VCC
@@ -174,7 +232,7 @@ __declspec(dllexport) DWORD NvOptimusEnablement = 1;
 __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 #endif
 
-#if defined(HL_LINUX) || defined(HL_OSX)
+#if defined(HL_LINUX) || defined(HL_MAC)
 #include <signal.h>
 static void handle_signal( int signum ) {
 	signal(signum, SIG_DFL);
@@ -189,6 +247,7 @@ static void setup_handler() {
 	act.sa_handler = handle_signal;
 	act.sa_flags = 0;
 	sigemptyset(&act.sa_mask);
+	signal(SIGPIPE, SIG_IGN);
 	sigaction(SIGSEGV,&act,NULL);
 	sigaction(SIGTERM,&act,NULL);
 }
@@ -202,7 +261,9 @@ int wmain(int argc, pchar *argv[]) {
 #else
 int main(int argc, pchar *argv[]) {
 #endif
+	static vclosure cl;
 	pchar *file = NULL;
+	char *error_msg = NULL;
 	int debug_port = -1;
 	bool debug_wait = false;
 	pchar *standalone = NULL;
@@ -212,6 +273,9 @@ int main(int argc, pchar *argv[]) {
 		vdynamic *ret;
 		vclosure c;
 	} ctx;
+	bool hot_reload = false;
+	int profile_count = -1;
+	main_context ctx;
 	bool isExc = false;
 	int first_boot_arg = -1;
 	argv++;
@@ -235,8 +299,17 @@ int main(int argc, pchar *argv[]) {
 			continue;
 		}
 		if( pcompare(arg,PSTR("--version")) == 0 ) {
-			printf("%d.%d.%d",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
+			printf("%d.%d.%d",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
 			return 0;
+		}
+		if( pcompare(arg,PSTR("--hot-reload")) == 0 ) {
+			hot_reload = true;
+			continue;
+		}
+		if( pcompare(arg,PSTR("--profile")) == 0 ) {
+			if( argc-- == 0 ) break;
+			profile_count = ptoi(*argv++);
+			continue;
 		}
 		if( *arg == '-' || *arg == '+' ) {
 			if( first_boot_arg < 0 ) first_boot_arg = argc + 1;
@@ -279,7 +352,7 @@ int main(int argc, pchar *argv[]) {
 			fchk = pfopen(file, "rb");
 		}
 		if( fchk == NULL ) {
-			printf("HL/JIT %d.%d.%d (c)2015-2018 Haxe Foundation\n  Usage : hl [--debug <port>] [--debug-wait] <file>\n",HL_VERSION>>8,(HL_VERSION>>4)&15,HL_VERSION&15);
+			printf("HL/JIT %d.%d.%d (c)2015-2020 Haxe Foundation\n  Usage : hl [--debug <port>] [--debug-wait] <file>\n",HL_VERSION>>16,(HL_VERSION>>8)&0xFF,HL_VERSION&0xFF);
 			return 1;
 		}
 		fclose(fchk);
@@ -289,25 +362,34 @@ int main(int argc, pchar *argv[]) {
 		}
 	}
 	hl_sys_init((void**)argv,argc,file);
-	if( ctx.code == NULL )
-		ctx.code = load_code(file);
-	if( ctx.code == NULL )
+	hl_register_thread(&ctx);
+	ctx.file = file;
+	ctx.code = load_code(file, &error_msg, true);
+	if( ctx.code == NULL ) {
+		if( error_msg ) printf("%s\n", error_msg);
 		return 1;
+	}
 	ctx.m = hl_module_alloc(ctx.code);
 	if( ctx.m == NULL )
 		return 2;
-	if( !hl_module_init(ctx.m) )
+	if( !hl_module_init(ctx.m,hot_reload) )
 		return 3;
+	if( hot_reload ) {
+		ctx.file_time = pfiletime(ctx.file);
+		hl_setup_reload_check(check_reload,&ctx);
+	}
 	hl_code_free(ctx.code);
 	if( debug_port > 0 && !hl_module_debug(ctx.m,debug_port,debug_wait) ) {
 		fprintf(stderr,"Could not start debugger on port %d",debug_port);
 		return 4;
 	}
-	ctx.c.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
-	ctx.c.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
-	ctx.c.hasValue = 0;
+	cl.t = ctx.code->functions[ctx.m->functions_indexes[ctx.m->code->entrypoint]].type;
+	cl.fun = ctx.m->functions_ptrs[ctx.m->code->entrypoint];
+	cl.hasValue = 0;
 	setup_handler();
-	ctx.ret = hl_dyn_call_safe(&ctx.c,NULL,0,&isExc);
+	hl_profile_setup(profile_count);
+	ctx.ret = hl_dyn_call_safe(&cl,NULL,0,&isExc);
+	hl_profile_end();
 	if( isExc ) {
 		varray *a = hl_exception_stack();
 		int i;
@@ -320,6 +402,7 @@ int main(int argc, pchar *argv[]) {
 	}
 	hl_module_free(ctx.m);
 	hl_free(&ctx.code->alloc);
+	hl_unregister_thread();
 	hl_global_free();
 	return 0;
 }

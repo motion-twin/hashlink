@@ -33,9 +33,10 @@ HL_API hl_socket *hl_socket_accept( hl_socket *s );
 HL_API int hl_socket_send( hl_socket *s, vbyte *buf, int pos, int len );
 HL_API int hl_socket_recv( hl_socket *s, vbyte *buf, int pos, int len );
 HL_API void hl_sys_sleep( double t );
-HL_API int hl_thread_id();
 HL_API void *hl_gc_threads_info();
 HL_API int hl_sys_getpid();
+
+HL_API int hl_closure_stack_capture;
 
 static hl_socket *debug_socket = NULL;
 static hl_socket *client_socket = NULL;
@@ -60,7 +61,10 @@ static void hl_debug_loop( hl_module *m ) {
 	flags |= 4;
 	loop = true;
 #	endif
-	hl_get_thread()->exc_flags |= HL_THREAD_INVISIBLE;
+#	ifdef HL_WIN_CALL
+	flags |= 8;
+#	endif
+	hl_get_thread()->flags |= HL_THREAD_INVISIBLE;
 	do {
 		int i;
 		vbyte cmd;
@@ -98,7 +102,10 @@ static void hl_debug_loop( hl_module *m ) {
 			send(d->offsets,(d->large ? sizeof(int) : sizeof(unsigned short)) * (f->nops + 1));
 		}
 
+		hl_closure_stack_capture = 8;
+
 		// wait answer
+		// for some reason, this is not working on windows (recv returns 0 ?)
 		hl_socket_recv(s,&cmd,0,1);
 		hl_socket_close(s);
 		debugger_connected = true;
