@@ -173,15 +173,14 @@ hl_code *try_load_embedded_module() {
 	if (rsrc != NULL) {
 		size = SizeofResource(NULL, rsrc);
 		fdata = LoadResource(NULL, rsrc);
+		char* errorMessage = NULL;
 		if (size > 0 && fdata != NULL) 
-			code = hl_code_read((unsigned char*)fdata, size);
+			code = hl_code_read((unsigned char*)fdata, size, &errorMessage);
 	}
 #endif
 
 	return code;
 }
-
-
 
 static hl_code *load_code( const pchar *file, char **error_msg, bool print_errors ) {
 	hl_code *code;
@@ -267,12 +266,6 @@ int main(int argc, pchar *argv[]) {
 	int debug_port = -1;
 	bool debug_wait = false;
 	pchar *standalone = NULL;
-	struct {
-		hl_code *code;
-		hl_module *m;
-		vdynamic *ret;
-		vclosure c;
-	} ctx;
 	bool hot_reload = false;
 	int profile_count = -1;
 	main_context ctx;
