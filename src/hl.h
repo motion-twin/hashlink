@@ -64,6 +64,10 @@
 #	define HL_PS
 #endif
 
+#ifdef __PROSPERO__
+#	define HL_PS5
+#endif
+
 #ifdef __NX__
 #	define HL_NX
 #endif
@@ -72,7 +76,7 @@
 #	define HL_XBO
 #endif
 
-#if defined(HL_PS) || defined(HL_NX) || defined(HL_XBO)
+#if defined(HL_PS) || defined(HL_PS5) || defined(HL_NX) || defined(HL_XBO)
 #	define HL_CONSOLE
 #endif
 
@@ -263,7 +267,7 @@ C_FUNCTION_END
 
 #if defined(HL_VCC)
 #	define hl_debug_break()	if( IsDebuggerPresent() ) __debugbreak()
-#elif defined(HL_PS) && defined(_DEBUG)
+#elif (defined(HL_PS) && defined(_DEBUG)) || (defined(HL_PS5) && defined(_DEBUG))
 #	define hl_debug_break()	__debugbreak()
 #elif defined(HL_NX)
 C_FUNCTION_BEGIN
