@@ -37,7 +37,7 @@
 
 #else
 
-#if defined(__ORBIS__) || defined(__NX__)
+#if defined(__ORBIS__) || defined(__PROSPERO__) || defined(__NX__)
 #	include <hl.h>
 #	include <posix/posix.h>
 #else
