@@ -703,7 +703,11 @@ void *hl_gc_alloc_gen( hl_type *t, int size, int flags ) {
 
 // -------------------------  MARKING ----------------------------------------------------------
 
+#ifdef HL_NX
+static float gc_mark_threshold = 0.5f;
+#else
 static float gc_mark_threshold = 0.2f;
+#endif
 static int mark_size = 0;
 static unsigned char *mark_data = NULL;
 static void **cur_mark_stack = NULL;
