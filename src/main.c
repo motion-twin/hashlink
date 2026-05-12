@@ -49,6 +49,9 @@ typedef char pchar;
 #ifndef HL_WIN
 #	include <limits.h>
 #endif
+#ifdef HL_LINUX
+#	include <unistd.h> //use proper readlink decl
+#endif
 
 typedef struct {
 	hl_code *code;
